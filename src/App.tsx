@@ -3,11 +3,12 @@ import ndarray from "ndarray";
 import ops from "ndarray-ops";
 import { Tensor, InferenceSession } from "onnxruntime-web";
 import loadImage from "blueimp-load-image";
-import { createModelCpu } from "./utils";
+import { createModelCpu, runModel } from "./utils";
 
 export default function ObjectDetector() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [session, setSession] = useState<InferenceSession | null>(null);
+  const [sessionRunning, setSessionRunning] = useState<boolean>(false);
 
   useEffect(() => {
     (async () => {
@@ -58,6 +59,9 @@ export default function ObjectDetector() {
   };
 
   const postprocess = async (tensor: Tensor, inferenceTime: number) => {
+    console.log("outputTensor", tensor);
+    console.log("inferenceTime", inferenceTime);
+
     try {
       const originalOutput = new Tensor(
         "float32",
@@ -69,6 +73,15 @@ export default function ObjectDetector() {
     } catch (e) {
       alert("Model is not valid!");
     }
+  };
+
+  const runSession = async (ctx: CanvasRenderingContext2D) => {
+    if (!session) return;
+    setSessionRunning(true);
+    const data = preprocess(ctx);
+    const [outputTensor, inferenceTime] = await runModel(session, data);
+
+    postprocess(outputTensor, inferenceTime);
   };
 
   const handleChange = (e: any) => {
@@ -97,6 +110,8 @@ export default function ObjectDetector() {
             canvas.width,
             canvas.height
           );
+
+          runSession(ctx);
         }
       },
       { cover: true, crop: true, canvas: true, crossOrigin: "Anonymous" }
