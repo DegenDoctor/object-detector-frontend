@@ -10,10 +10,18 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "blueimp-load-image": "^5.16.0",
+    "ndarray": "^1.0.19",
+    "ndarray-ops": "^1.2.2",
+    "onnxruntime-web": "^1.14.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "vite-plugin-static-copy": "^0.15.0"
   },
   "devDependencies": {
+    "@types/blueimp-load-image": "^5.16.2",
+    "@types/ndarray": "^1.0.11",
+    "@types/ndarray-ops": "^1.2.4",
     "@types/react": "^18.0.28",
     "@types/react-dom": "^18.0.11",
     "@typescript-eslint/eslint-plugin": "^5.57.1",
