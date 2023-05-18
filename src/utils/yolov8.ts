@@ -1,12 +1,6 @@
 import { InferenceSession, Tensor } from "onnxruntime-web";
 import cv from "@techstark/opencv-js";
 
-interface YOLOv8Config {
-  topK: number; // Integer representing the maximum number of boxes to be selected per class
-  iouThreshold: number; // Float representing the threshold for deciding whether boxes overlap too much with respect to IOU
-  scoreThreshold: number; // Float representing the threshold for deciding when to remove boxes based on score
-}
-
 interface ObjectBox {
   label: number;
   probability: number;
@@ -15,13 +9,13 @@ interface ObjectBox {
 
 /**
  * Preprocessing image
- * @param {HTMLImageElement | HTMLCanvasElement} source image source
+ * @param {HTMLImageElement} source image source
  * @param {Number} modelWidth model input width
  * @param {Number} modelHeight model input height
  * @return preprocessed image and configs
  */
 export const preprocess = (
-  source: HTMLCanvasElement,
+  source: HTMLImageElement,
   modelWidth: number,
   modelHeight: number
 ) => {
@@ -51,45 +45,47 @@ export const preprocess = (
   mat.delete();
   matC3.delete();
   matPad.delete();
-  console.log(input.data32F);
+
   return { input, xRatio, yRatio };
 };
 
 /**
  * Detect Image
- * @param {HTMLImageElement | HTMLCanvasElement} source image source
+ * @param {HTMLImageElement} image image to detect
+ * @param {HTMLImageElement} canvas canvas to draw boxes
  * @param {InferenceSession} yolov8 YOLOv8 onnxruntime session
  * @param {string[]} labels
  * @param {InferenceSession} nms NMS onnxruntime session
- * @param {YOLOv8Config} config NMS onnxruntime session
+ * @param {Number} topk Integer representing the maximum number of boxes to be selected per class
+ * @param {Number} iouThreshold Float representing the threshold for deciding whether boxes overlap too much with respect to IOU
+ * @param {Number} scoreThreshold Float representing the threshold for deciding when to remove boxes based on score
  * @param {Number[]} inputShape model input shape. Normally in YOLO model [batch, channels, width, height]
  * @return preprocessed image and configs
  */
 export const detectObjects = async (
-  source: HTMLCanvasElement,
+  image: HTMLImageElement,
+  canvas: HTMLCanvasElement,
   yolov8: InferenceSession,
   labels: string[],
   nms: InferenceSession,
-  config: YOLOv8Config,
-  inputShape: number[]
+  topk: number,
+  iouThreshold: number,
+  scoreThreshold: number,
+  inputShape: number[] = [1, 3, 640, 640]
 ) => {
+  const [modelWidth, modelHeight] = inputShape.slice(2);
   const classLength = labels.length;
-  const { input, xRatio, yRatio } = preprocess(source, 640, 640);
+  const { input, xRatio, yRatio } = preprocess(image, modelWidth, modelHeight);
   const tensor = new Tensor("float32", input.data32F, inputShape);
-  const configTensor = new Tensor(
+  const config = new Tensor(
     "float32",
-    new Float32Array([
-      classLength,
-      config.topK,
-      config.iouThreshold,
-      config.scoreThreshold,
-    ])
+    new Float32Array([classLength, topk, iouThreshold, scoreThreshold])
   );
 
   const { output0 } = await yolov8.run({ images: tensor });
   const { selected } = await nms.run({
     detection: output0,
-    config: configTensor,
+    config: config,
   });
 
   const boxes = [];
@@ -120,7 +116,7 @@ export const detectObjects = async (
   }
 
   console.log(boxes);
-  renderBoxes(source, boxes, labels);
+  renderBoxes(canvas, boxes, labels);
   return;
 };
 
