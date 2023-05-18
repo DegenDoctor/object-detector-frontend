@@ -46,6 +46,8 @@ export const preprocess = (
   matC3.delete();
   matPad.delete();
 
+  console.log(input, xRatio, yRatio);
+
   return { input, xRatio, yRatio };
 };
 
@@ -130,7 +132,6 @@ export const renderBoxes = (
   if (!ctx) return;
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height); // clean canvas
 
-  console.log(ctx.canvas.width, ctx.canvas.height);
   // font configs
   const font = "16px Arial";
   ctx.font = font;
