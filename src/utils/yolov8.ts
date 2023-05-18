@@ -74,6 +74,7 @@ export const detectObjects = async (
   inputShape: number[] = [1, 3, 640, 640]
 ) => {
   const [modelWidth, modelHeight] = inputShape.slice(2);
+
   const classLength = labels.length;
   const { input, xRatio, yRatio } = preprocess(image, modelWidth, modelHeight);
   const tensor = new Tensor("float32", input.data32F, inputShape);
@@ -125,11 +126,13 @@ export const renderBoxes = (
   boxes: ObjectBox[],
   labels: string[]
 ) => {
-  const ctx = canvas.getContext("2d")!;
-  // ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height); // clean canvas
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height); // clean canvas
 
+  console.log(ctx.canvas.width, ctx.canvas.height);
   // font configs
-  const font = "20px Arial";
+  const font = "16px Arial";
   ctx.font = font;
   ctx.textBaseline = "top";
 

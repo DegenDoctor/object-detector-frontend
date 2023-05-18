@@ -7,6 +7,7 @@ import useYoloEngine from "./hooks/useYoloEngine";
 
 export default function ObjectDetector() {
   const [files, setFiles] = useState<any[]>([]);
+  const [imgLoaded, setImgLoaded] = useState<boolean>(false);
   const { getRootProps, getInputProps } = useDropzone({
     accept: {
       "image/*": [],
@@ -37,6 +38,8 @@ export default function ObjectDetector() {
     )
       return;
 
+    if (!imgLoaded) return;
+
     detectObjects(
       imageRef.current,
       canvasRef.current,
@@ -44,10 +47,10 @@ export default function ObjectDetector() {
       labels,
       nms,
       100,
-      0.25,
-      0.5
+      0.45,
+      0.2
     );
-  }, [files, imageRef, canvasRef, loading, labels, nms, yolov8]);
+  }, [files, imageRef, canvasRef, loading, labels, nms, yolov8, imgLoaded]);
 
   return (
     <div className="container mx-auto">
@@ -58,27 +61,30 @@ export default function ObjectDetector() {
           <h1 className="text-lg">YOLOv8 Model</h1>
 
           <div className="flex">
-            <div className="flex-1">
+            <div className="w-full">
               <div {...getRootProps({ className: "dropzone" })}>
                 <input {...getInputProps()} />
                 <p>Drag 'n' drop some files here, or click to select files</p>
 
                 {files.length > 0 && (
-                  <div className="relative">
+                  <div className="relative flex items-center">
                     <img
                       ref={imageRef}
                       src={files[0].preview}
+                      onLoad={() => setImgLoaded(true)}
                       alt="img-preview"
                     />
                     <canvas
                       ref={canvasRef}
                       className="absolute top-0 left-0 w-full h-full"
+                      width={640}
+                      height={640}
                     />
                   </div>
                 )}
               </div>
             </div>
-            <div className="flex-1">
+            <div className="w-full">
               <div className="">settings</div>
             </div>
           </div>
