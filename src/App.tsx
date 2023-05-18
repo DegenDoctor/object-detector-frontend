@@ -1,92 +1,41 @@
-import React, { useEffect, useRef, useState } from "react";
-import ndarray from "ndarray";
-import ops from "ndarray-ops";
-import { Tensor, InferenceSession } from "onnxruntime-web";
+import React, { Fragment, useEffect, useRef, useState } from "react";
+
+import { InferenceSession } from "onnxruntime-web";
 import loadImage from "blueimp-load-image";
-import { createModelCpu, runModel } from "./utils";
+import { HashLoader } from "react-spinners";
+import { createModelCpu, warmupModel } from "./utils";
+import { detectObjects } from "./utils/yolov8";
 
 export default function ObjectDetector() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [session, setSession] = useState<InferenceSession | null>(null);
-  const [sessionRunning, setSessionRunning] = useState<boolean>(false);
+  const [yolov8, setYolov8] = useState<InferenceSession | null>(null);
+  const [labels, setLabels] = useState<string[]>([]);
+  const [nms, setNms] = useState<InferenceSession | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+
+  const modelInputShape = [1, 3, 640, 640];
 
   useEffect(() => {
     (async () => {
-      const session = await createModelCpu(`/yolov8n.onnx`);
-      console.log(session);
-      setSession(session);
+      setLoading(true);
+      const [yolov8, labels, nms] = await Promise.all([
+        createModelCpu(`/yolov8n.onnx`),
+        fetch("/labels.json").then<string[]>((res) => res.json()),
+        createModelCpu(`/nms.onnx`),
+      ]);
+
+      await warmupModel(yolov8, [1, 3, 640, 640]);
+      setYolov8(yolov8);
+      setLabels(labels);
+      setNms(nms);
+      setLoading(false);
     })();
   }, []);
 
-  const preprocess = (ctx: CanvasRenderingContext2D): Tensor => {
-    const imageData = ctx.getImageData(
-      0,
-      0,
-      ctx.canvas.width,
-      ctx.canvas.height
-    );
-    const { data, width, height } = imageData;
-    // data processing
-    const dataTensor = ndarray(new Float32Array(data), [width, height, 4]);
-    const dataProcessedTensor = ndarray(new Float32Array(width * height * 3), [
-      1,
-      3,
-      width,
-      height,
-    ]);
-
-    ops.assign(
-      dataProcessedTensor.pick(0, 0, null, null),
-      dataTensor.pick(null, null, 0)
-    );
-    ops.assign(
-      dataProcessedTensor.pick(0, 1, null, null),
-      dataTensor.pick(null, null, 1)
-    );
-    ops.assign(
-      dataProcessedTensor.pick(0, 2, null, null),
-      dataTensor.pick(null, null, 2)
-    );
-
-    const tensor = new Tensor("float32", new Float32Array(width * height * 3), [
-      1,
-      3,
-      width,
-      height,
-    ]);
-    (tensor.data as Float32Array).set(dataProcessedTensor.data);
-    return tensor;
-  };
-
-  const postprocess = async (tensor: Tensor, inferenceTime: number) => {
-    console.log("outputTensor", tensor);
-    console.log("inferenceTime", inferenceTime);
-
-    try {
-      const originalOutput = new Tensor(
-        "float32",
-        tensor.data as Float32Array,
-        [1, 125, 13, 13]
-      );
-
-      console.log(originalOutput);
-    } catch (e) {
-      alert("Model is not valid!");
-    }
-  };
-
-  const runSession = async (ctx: CanvasRenderingContext2D) => {
-    if (!session) return;
-    setSessionRunning(true);
-    const data = preprocess(ctx);
-    const [outputTensor, inferenceTime] = await runModel(session, data);
-
-    postprocess(outputTensor, inferenceTime);
-  };
-
   const handleChange = (e: any) => {
+    if (!yolov8) return;
+    if (!nms) return;
     const url = e.target.files[0];
-    console.log(url);
 
     loadImage(
       url,
@@ -111,7 +60,14 @@ export default function ObjectDetector() {
             canvas.height
           );
 
-          runSession(ctx);
+          detectObjects(
+            canvasRef.current,
+            yolov8,
+            labels,
+            nms,
+            { topK: 100, iouThreshold: 0.25, scoreThreshold: 0.45 },
+            modelInputShape
+          );
         }
       },
       { cover: true, crop: true, canvas: true, crossOrigin: "Anonymous" }
@@ -121,22 +77,28 @@ export default function ObjectDetector() {
   return (
     <div className="container mx-auto">
       <div className="flex flex-wrap justify-evenly items-center my-5">
-        <div className="">
-          <canvas
-            id="input-canvas"
-            ref={canvasRef}
-            width={640}
-            height={640}
-            className="border border-black"
-          />
-        </div>
-        <div className="">
-          <input
-            type="file"
-            onChange={handleChange}
-            className="py-2.5 px-5 mr-2 mb-2 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-200 "
-          />
-        </div>
+        {loading ? (
+          <HashLoader color="#36d7b7" />
+        ) : (
+          <Fragment>
+            <div className="">
+              <canvas
+                id="input-canvas"
+                ref={canvasRef}
+                width={640}
+                height={640}
+                className="border border-black"
+              />
+            </div>
+            <div className="">
+              <input
+                type="file"
+                onChange={handleChange}
+                className="py-2.5 px-5 mr-2 mb-2 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-200 "
+              />
+            </div>
+          </Fragment>
+        )}
       </div>
     </div>
   );
